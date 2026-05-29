@@ -1,0 +1,4 @@
+/home/anton/Загрузки/Файлы/JatBrainsIDEs/Clion/Science_research_work/6_energy_2004/cmake-build-debug/CMakeFiles/my_lib.dir
+/home/anton/Загрузки/Файлы/JatBrainsIDEs/Clion/Science_research_work/6_energy_2004/cmake-build-debug/CMakeFiles/NIR6_new.dir
+/home/anton/Загрузки/Файлы/JatBrainsIDEs/Clion/Science_research_work/6_energy_2004/cmake-build-debug/CMakeFiles/edit_cache.dir
+/home/anton/Загрузки/Файлы/JatBrainsIDEs/Clion/Science_research_work/6_energy_2004/cmake-build-debug/CMakeFiles/rebuild_cache.dir

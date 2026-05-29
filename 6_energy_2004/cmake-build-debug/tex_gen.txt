@@ -1,0 +1,80 @@
+library(dplyr)
+library(tidyr)
+library(xtable)
+
+# Чтение файла
+lines <- readLines("results.csv")
+
+# Парсим распределение и размерность из первой строки
+line1 <- lines[1]
+dist_name <- gsub("\\(dim = .*\\)", "", line1)
+dim_val <- as.numeric(gsub(".*dim = (\\d+).*", "\\1", line1))
+
+# Парсим mean (строка 2)
+mean_vals <- as.numeric(strsplit(trimws(lines[2]), " ")[[1]])
+
+# Парсим variance (строка 3) - для dim x dim матрицы
+var_vals <- as.numeric(strsplit(trimws(lines[3]), " ")[[1]])
+var_matrix <- matrix(var_vals, nrow = dim_val, ncol = dim_val, byrow = TRUE)
+
+# Парсим h_2 и alpha (строка 4)
+h_alpha <- as.numeric(strsplit(trimws(lines[4]), " ")[[1]])
+
+# Данные
+df <- read.csv(text = paste(lines[5:length(lines)], collapse = "\n"))
+
+# Таблица с 3 знаками
+table_wide <- df %>%
+  mutate(row = ifelse(type == "A", "(A)", paste0("(E) n = ", n)),
+         value = round(value, 3)) %>%
+  select(row, h1, value) %>%
+  pivot_wider(names_from = h1, values_from = value)
+
+colnames(table_wide)[1] <- "$h_{1}$"
+
+# Формируем вектор mean
+mean_vec <- paste(mean_vals, collapse = ", ")
+
+# Формируем матрицу ковариации для LaTeX с горизонтальными линиями и лучшим форматированием
+build_matrix_latex <- function(mat) {
+  rows <- nrow(mat)
+  cols <- ncol(mat)
+  matrix_str <- "\\begin{pmatrix}\n"
+  for (i in 1:rows) {
+    # Форматируем числа с 2 знаками после запятой
+    row_str <- paste(sprintf("%.2f", mat[i, ]), collapse = " & ")
+    matrix_str <- paste0(matrix_str, row_str)
+    if (i < rows) matrix_str <- paste0(matrix_str, " \\\\\n")
+    # Добавляем горизонтальную линию между строками (опционально)
+    # if (i < rows) matrix_str <- paste0(matrix_str, " hdashline\n")
+  }
+  matrix_str <- paste0(matrix_str, "\n\\end{pmatrix}")
+  return(matrix_str)
+}
+
+var_matrix_latex <- build_matrix_latex(var_matrix)
+
+# Подпись
+caption_text <- sprintf(
+  "Значение эмпирической (Э) и асимптотической (A) мощности. %s, $\\mu = (%s)$, $\\Sigma = %s$, $h_2 = %g$, $\\alpha = %g$",
+  dist_name, mean_vec, var_matrix_latex, h_alpha[1], h_alpha[2]
+)
+
+# Xtable
+tab <- xtable(table_wide, caption = caption_text, label = "tab:power_table", digits = 3)
+
+# Экспорт с booktabs
+print(tab,
+      include.rownames = FALSE,
+      caption.placement = "top",
+      booktabs = FALSE,
+      sanitize.text.function = function(x) x,
+      file = "table.tex",
+      hline.after = c(-1, 0, nrow(table_wide)))
+
+cat("Таблица сохранена в table.tex\n")
+cat("Распределение:", dist_name, "\n")
+cat("Размерность:", dim_val, "\n")
+cat("Mean:", mean_vec, "\n")
+cat("Variance matrix:\n")
+print(var_matrix)
