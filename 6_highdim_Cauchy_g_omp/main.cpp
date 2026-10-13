@@ -20,7 +20,7 @@ using namespace Eigen;
 using namespace std;
 
 const int MONTE_CARLO_CNT = 1e7; // 1e8 - 5 секунд при dim = 1
-const int EMPIRICAL_CNT = 1e4; // для подсчета эмпирического среднего и ковариации
+const int EMPIRICAL_CNT = 1e3; // для подсчета эмпирического среднего и ковариации
 
 inline double square(double x) {
     return x*x;
@@ -484,6 +484,28 @@ inline double ddg(double x) {
 //}
 
 
+//template<int dim>
+//double T(double X[][dim], double Y[][dim], size_t n, double (*g)(double)) // X - выборка размера n из распределения F_1, Y - выборка размера n из распределения F_2
+//{
+//    double res = 0;
+//#pragma omp simd collapse(2) reduction(+:res)
+//    for (int i = 0; i < n; ++i) {
+//        for (int j = 0; j < n; ++j) { // тут можно сократить вычисления вдвое, если считать j < n, но тогда нужно, чтобы g(0) = 0 И ТОГДА РЕЗУЛЬТАТ НУЖНО БУДЕТ НА 2 ДОМНОЖИТЬ !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//            double normXiXj = 0;
+//            double normYiYj = 0;
+//            double normXiYj = 0;
+//            for (int k = 0; k < dim; ++k) {
+//                normXiXj += square(X[i][k] - X[j][k]);
+//                normYiYj += square(Y[i][k] - Y[j][k]);
+//                normXiYj += square(X[i][k] - Y[j][k]);
+//            }
+//            res += g(sqrt(normXiYj)) - 0.5 * ( g(sqrt(normXiXj)) + g(sqrt(normYiYj)) );
+//        }
+//    }
+//    return res / (double)(n*n);
+//}
+
+
 template<int dim>
 double T(double X[][dim], double Y[][dim], size_t n, double (*g)(double)) // X - выборка размера n из распределения F_1, Y - выборка размера n из распределения F_2
 {
@@ -491,20 +513,13 @@ double T(double X[][dim], double Y[][dim], size_t n, double (*g)(double)) // X -
 #pragma omp simd collapse(2) reduction(+:res)
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < n; ++j) { // тут можно сократить вычисления вдвое, если считать j < n, но тогда нужно, чтобы g(0) = 0 И ТОГДА РЕЗУЛЬТАТ НУЖНО БУДЕТ НА 2 ДОМНОЖИТЬ !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            double normXiXj = 0;
-            double normYiYj = 0;
-            double normXiYj = 0;
             for (int k = 0; k < dim; ++k) {
-                normXiXj += square(X[i][k] - X[j][k]);
-                normYiYj += square(Y[i][k] - Y[j][k]);
-                normXiYj += square(X[i][k] - Y[j][k]);
+                res += 2 * g(X[i][k] - Y[j][k]) - g(X[i][k] - X[j][k]) - g(Y[i][k] - Y[j][k]);
             }
-            res += g(sqrt(normXiYj)) - 0.5 * ( g(sqrt(normXiXj)) + g(sqrt(normYiYj)) );
         }
     }
     return res / (double)(n*n);
 }
-
 
 int main()
 {
@@ -515,18 +530,18 @@ int main()
     std::mt19937_64 engine(11);
     const int dim = 2;
     double mean[dim] = {0, 0};
-    double variance[dim][dim] = {{1.0, 0.0},
-                                 {0.0, 1.0}}; // по какой-то причине при коррелируемости теор мощность возрастает, хотя должна быть той же. Так что лучше некоррелированно запускать
+    double variance[dim][dim] = {{1.0, 0.5},
+                                 {0.5, 1.0}}; // по какой-то причине при коррелируемости теор мощность возрастает, хотя должна быть той же. Так что лучше некоррелированно запускать
 
     // Задаем первое распределение
-    using DistTamplate = CauchyGenerator<dim>; // здесь дисперсия(параметр inv_sigma_matrix ниже) должен быть вычислен не через оценку, а "точно", так как дисперсии нет
+//    using DistTamplate = CauchyGenerator<dim>; // здесь дисперсия(параметр inv_sigma_matrix ниже) должен быть вычислен не через оценку, а "точно", так как дисперсии нет
 //    using DistTamplate = StudentGenerator<dim>; // здесь дисперсия должна быть "точной", если nu <= 2, мат ожидание должно быть точным, если nu <= 1
-//    using DistTamplate = NormalGenerator<dim>;
+    using DistTamplate = NormalGenerator<dim>;
     DistTamplate dist_0(engine, mean, variance);
 
     // Задаем гиперпараметры
-    const std::vector<size_t> N = {100, 400, 900, 1500, 3000}; // 100, 400, 900
-    const std::vector<double> H_1 = {0, 0.5, 2, 7}; // 0, 0.5, 1, 2, 3, 4, 5, 6, 7
+    const std::vector<size_t> N = {100, 400, 900}; // 100, 400, 900
+    const std::vector<double> H_1 = {0, 0.5, 1, 2, 3, 4, 5, 6, 7}; // 0, 0.5, 1, 2, 3, 4, 5, 6, 7
     double h_2 = 0;
     double alpha = 0.05;
 
@@ -596,6 +611,12 @@ int main()
             inv_sigma_x[i][j] = inv_sigma_matrix(i, j) / inv_sigma_matrix.maxCoeff(); // делим на максимум, чтобы(например Коши) inv_sigma_x(обратная к корню дисперсии) было не нулевым
         }
     }
+
+//    for (int i = 0; i < dim; ++i) { // если хочется посчитать теоретическую мощность, то раскомментить
+//        for (int j = 0; j < dim; ++j) {
+//            inv_sigma_x[i][j] = (i == j);
+//        }
+//    }
     dist_0.set_scale(minus_E_x, inv_sigma_x);
 
 
@@ -676,8 +697,11 @@ int main()
                 DistTamplate local_dist_1(local_engine_1, m_1, variance_1);
                 local_dist_1.set_scale(minus_E_x, inv_sigma_x);
 
-                for (int i = 0; i < 2 * n; ++i) { // заполняем X, Y
+                for (int i = 0; i < n; ++i) { // заполняем X, Y
                     local_dist_0.generate_scale(XY[i]);
+                }
+                for (int i = n; i < 2 * n; ++i) { // заполняем X, Y
+                    local_dist_1.generate_scale(XY[i]);
                 }
 
                 for (int i = 0; i < M; ++i) {

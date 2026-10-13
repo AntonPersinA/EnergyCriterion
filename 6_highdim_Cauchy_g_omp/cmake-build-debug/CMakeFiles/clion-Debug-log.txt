@@ -4,6 +4,6 @@
 -- OpenMP: TRUE
 -- Boost: 1.74.0
 -- Build type: Debug
--- Configuring done (0.1s)
+-- Configuring done (0.0s)
 -- Generating done (0.0s)
 -- Build files have been written to: /home/anton/Загрузки/Файлы/JatBrainsIDEs/Clion/Science_research_work/6_highdim_Cauchy_g_omp/cmake-build-debug
